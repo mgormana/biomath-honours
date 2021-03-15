@@ -26,6 +26,7 @@ totalPop <- function(t, x, parms = NULL) {
   dL = h*(I+U)*S - (e*L)
   dI = -(e*I) + (e*L)
   dD = (a*e)*I + b*d*U - g*d*D - (1-g)*d*D
+  dU = (1-a)*e*I - b*d*U - (1-b)*d*U
   dR = (1-g)*d*D + (1-b)*d*U
   dF = g*d*D
   list(c(dS, dL, dI, dD, dR, dF))
