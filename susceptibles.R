@@ -1,11 +1,25 @@
 #odesolver2
-a = 0.5
+library(deSolve)
+library(reshape2)
+library(ggplot2)
+library(dplyr)
+library(matlib)
+
+a1 = 0.02
+a2 = 0.5
+a3 = 0.9
 b = 0.975
-d = 0.1
-g = 0.061
 e = 0.4
-h = 0.8
+d = 2/18.5
+g = 0.061
+
+h = 0.1
 S = 100
+
+param1 <- c(a = 0.02, b = 0.975, e = 0.4, d = 2/18.5, g = 0.061)
+tf <- 30
+times <- seq(0, tf, by = 1)
+t0 <- c(S = 100, L = 0, I = 0, D = 0, U = 0, R = 0, F = 0)
 
 totalPop <- function(t, x, parms = NULL) {
   dS = -h*(I+U)*S
@@ -21,14 +35,25 @@ totalPop <- function(t, x, parms = NULL) {
 V <-matrix(c(
   -e, 0, 0, 0,
   e, -e, 0, 0,
-  0, (1-a)*e, 0, -d,
-  nrow = 4, ncol = 4, byrow = TRUE))
+  0, (1-a1)*e, 0, -d),
+  nrow = 4, ncol = 4, byrow = TRUE)
 
 w = matrix(c(1, 0, 0, 0), ncol =1, byrow = FALSE)
 beta = matrix(c(0, h, 0, h), nrow =1, byrow = TRUE)
-F = (w %*% beta)*S
+Z = (w %*% beta)*S
+x = matrix(c(L, I, D, U), ncol = 1, byrow = FALSE)
 
-dS = -h*(I+U)*S
-dx = F*x + V*x
+susceptibles <- function(t, parms = NULL) {
+  with(as.list(c(x, parms)))
+  dS = -h*(I+U)*S
+  dx = Z*x + V*x
+  list(c(dS, dx))
+}
 
-Ro = beta %*% V^(-1)%*%w%*%S
+#says 'unused argument (parms)' ?
+susceptODE <- ode(y = t0, times, func = susceptibles, parms = param1)
+susceptODE.df <- as.data.frame(susceptODE)
+
+#says V is singular
+inverseV <- solve(V)
+Ro = beta %*% inverseV %*% w %*% S
