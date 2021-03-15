@@ -3,7 +3,7 @@ a = 0.5
 b = 0.975
 d = 0.1
 g = 0.061
-e = .4
+e = 0.4
 h = 0.8
 S = 100
 
@@ -28,10 +28,7 @@ w = matrix(c(1, 0, 0, 0), ncol =1, byrow = FALSE)
 beta = matrix(c(0, h, 0, h), nrow =1, byrow = TRUE)
 F = (w %*% beta)*S
 
-function(t) {
-  dS = -h*(I+U)*S
-  dx = F*x + V*x
-  list(c(dS, dx))
-}
+dS = -h*(I+U)*S
+dx = F*x + V*x
 
 Ro = beta %*% V^(-1)%*%w%*%S
