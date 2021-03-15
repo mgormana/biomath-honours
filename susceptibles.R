@@ -35,6 +35,7 @@ totalPop <- function(t, x, parms = NULL) {
 V <-matrix(c(
   -e, 0, 0, 0,
   e, -e, 0, 0,
+  0, a1*e, -d, b*d,
   0, (1-a1)*e, 0, -d),
   nrow = 4, ncol = 4, byrow = TRUE)
 
