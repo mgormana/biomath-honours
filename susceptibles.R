@@ -46,16 +46,13 @@ susceptODE1c.df <- rename(susceptODE1c.df, state = variable, scenarioC = value)
 #merge to one data frame
 susceptODE1.df <- merge(susceptODE1a.df, susceptODE1b.df, by = c("time", "state"))
 susceptODE1.df <- merge(susceptODE1.df, susceptODE1c.df, by = c("time", "state"))
+susceptODE1.df <- melt(susceptODE1.df, id = c("time", "state"))
+susceptODE1.df <- rename(susceptODE1.df, scenario = variable, stateProb = value)
 
 #plotting
-ggplot(susceptODE1a.df, aes(x=time, y = scenarioA, color = state)) + 
-  geom_line()
-
-ggplot(susceptODE1b.df, aes(x=time, y = scenarioB, color = state)) + 
-  geom_line()
-
-ggplot(susceptODE1c.df, aes(x=time, y = scenarioC, color = state)) + 
-  geom_line()
+ggplot(susceptODE1.df, aes(x=time, y = stateProb, color = state)) + 
+  geom_line() + 
+  facet_wrap(~scenario)
 
 tail(susceptODE1a)
 tail(susceptODE1b)
