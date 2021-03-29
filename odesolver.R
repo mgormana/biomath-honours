@@ -1,4 +1,4 @@
-library("deSolve")
+library(deSolve)
 library(reshape2)
 library(ggplot2)
 library(dplyr)
@@ -9,9 +9,10 @@ asymptomatics <- function(t, x, parms = NULL) {
     dI = -(e*I) + (e*L)
     dD = (a*e)*I + b*d*U - g*d*D - (1-g)*d*D
     dU = (1-a)*e*I - b*d*U - (1-b)*d*U
-    dR = (1-g)*d*D + (1-b)*d*U
+    dRd = (1-g)*d*D 
+    dRu = (1-b)*d*U
     dF = g*d*D
-    list(c(dL, dI, dD, dU, dR, dF))
+    list(c(dL, dI, dD, dU, dRd, dRu, dF))
     
   })
 }
@@ -20,12 +21,12 @@ asymptomatics <- function(t, x, parms = NULL) {
 param1 <- c(a = 0.02, b = 0.975, e = 2/5, d = 2/(21-(1/.4)), g = 0.061)
 param2 <- c(a = 0.5, b = 0.975, e = 2/5, d = 2/(21-(1/.4)), g = 0.061)
 param3 <- c(a = 0.9, b = 0.975, e = 2/5, d = 2/(21-(1/.4)), g = 0.061)
-tf <- 30
+tf <- 14
 times <- seq(0,tf, by = 1)
-t0 <- c(L = 1, I = 0, D = 0, U = 0, R = 0, F = 0)
+t0 <- c(L = 1, I = 0, D = 0, U = 0, Rd = 0, Ru = 0, F = 0)
 
 #95% bounds of infectious period 
-param1b <- c(a = 0.02, b = 0.975, e = 2/5, d = 2/(2.6-(1/.4)), g = 0.061)
+param1b <- c(a = 0.02, b = 0.975, e = 1/5, d = 2/(2.6-(1/.4)), g = 0.061)
 param1c <- c(a = 0.02, b = 0.975, e = 2/5, d = 2/(33-(1/.4)), g = 0.061)
 
 param2b <- c(a = 0.5, b = 0.975, e = 2/5, d = 2/(2.6-(1/.4)), g = 0.061)
@@ -103,10 +104,6 @@ res_ode3test.df <- melt(res_ode3test.df, id = c("time", "state"))
 res_ode3test.df <- rename(res_ode3test.df, scenario = variable, stateProb = value)
 
 #plotting 
-ggplot(res_ode.df, aes(x=time, y = stateProb, color = state)) +
-  geom_line() + 
-  facet_wrap(~scenario)
-
 ggplot(res_odetest.df, aes(x = time, y = stateProb, color = state)) + 
   geom_line() + 
   facet_wrap(~scenario)
@@ -124,7 +121,7 @@ ggplot(res_ode3test.df, aes(x = time, y = stateProb, color = state)) +
   facet_wrap(~scenario)
   
 
-#matrix exp function
+#plot matrix exp
 probDetectedFn <- matrix(c(
   exp(-(2*t)/5), 0, 0, 0, 0, 0, 0, 0, 0, 
   (2*t*exp(-(2*t)/5))/5,exp(-(2*t)/5), 0,0,0,0, 0, 0, 0, 
