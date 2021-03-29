@@ -1,5 +1,4 @@
 library(expm)
-library(patchwork)
 # slope = speed of catching people 
 
 #alpha, sensitivity of test  (I want this to be the range, 0.67 to 0.99 from day 0 to 5)
@@ -27,12 +26,11 @@ pI2 = 0.25
 pU1 = 0.25
 pU2 = 0.25
 
-pD1
-  
+
 #transition matrix
 V1 <- matrix(c(
   -e, 0, 0, 0, 0, 0, 0, 0, 0, 
-   e, -e, 0, 0, 0, 0, 0, 0, 0, 
+  e, -e, 0, 0, 0, 0, 0, 0, 0, 
   0, a1*e, -d, 0, 0, 0, 0, 0, 0, 
   0, 0, d, -d, b*d, 0, 0, 0, 0, 
   0, (1-a1)*e, 0, 0, -d, 0, 0, 0, 0, 
@@ -70,7 +68,7 @@ V3 <- matrix(c(
 #probability vector 
 undetProb = matrix(c(pI1, pI2, 0, 0, pU1, pU2, 0, 0, 0), ncol=1, byrow = FALSE)
 
-#those who are undetected
+
 undetRec = matrix(c(1,1,0,0,1,1,0,1,0), nrow = 1, byrow = TRUE)
 detectedRec = matrix(c(0, 0, 1, 1, 0, 0, 1, 0, 1), nrow = 1, byrow = TRUE)
 
@@ -79,13 +77,12 @@ undetRec_prob1 = function(t) {undetRec%*%expm(V1*t)%*%undetProb}
 detectedRec_prob1 = function(t) {detectedRec%*%expm(V1*t)%*%undetProb}
 
 undetRec_prob2 = function(t) {undetRec%*%expm(V2*t)%*%undetProb}
-detectedRec_prob2 = function(t) {detectedRec%*%expm(V2*t)%*%undetProb}
+#detectedRec_prob2 = function(t) {detectedRec%*%expm(V2*t)%*%undetProb}
 
 undetRec_prob3 = function(t) {undetRec%*%expm(V3*t)%*%undetProb}
-detectedRec_prob3 = function(t) {detectedRec%*%expm(V3*t)%*%undetProb}
+#detectedRec_prob3 = function(t) {detectedRec%*%expm(V3*t)%*%undetProb}
 
 t = seq(0,30,by=.1)
-t.df = as.data.frame(t)
 
 undetProbM1 <- as.data.frame(sapply(t, undetRec_prob1))
 undetProbM2 <- as.data.frame(sapply(t, undetRec_prob2))
@@ -94,17 +91,9 @@ undetProbM <- merge(t, undetProbM1)
 undetProbM <- merge(undetProbM, undetProbM2)
 undetProbM <- merge(undetProbM, undetProbM3)
 
-undetplot1 <- qplot(t,sapply(t,undetRec_prob1),ylim=c(0,1))
-ggplot(undetProbM, aes(x = t, y = sapply(t, undetRec_prob2))) + geom_line() + xlim(0,1)
-
-undetplot2 <- qplot(t,sapply(t,undetRec_prob2),ylim=c(0,1))
-ggplot(undetProbM, aes(x = t, y = sapply(t, undetRec_prob1))) + geom_line() + xlim(0,1)
-
-undetplot3 <- qplot(t,sapply(t,undetRec_prob3),ylim=c(0,1))
-ggplot(undetProbM, aes(x = t, y = sapply(t, undetRec_prob1))) + geom_line() + xlim(0,1)
+qplot(t,sapply(t, undetRec_prob1) / sapply(t, detectedRec_prob1)) #plot over total sum of cases
+qplot(t, sapply(t, undetRec_prob2))
+qplot(t, sapply(t, undetRec_prob3))
 
 
-detplot1 <- qplot(t, sapply(t,detectedRec_prob1), ylim = c(0,1))
-detplot2 <- qplot(t, sapply(t,detectedRec_prob2), ylim = c(0,1))
-detplot3 <- qplot(t, sapply(t,detectedRec_prob3), ylim = c(0,1))
 
