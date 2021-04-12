@@ -1,5 +1,6 @@
 library(expm)
-# slope = speed of catching people 
+library(ggplot2)
+library(tidyverse)
 
 #alpha, sensitivity of test  (I want this to be the range, 0.67 to 0.99 from day 0 to 5)
 a1 = 0.02
@@ -11,8 +12,6 @@ e = 2/5
 
 #delta, infectious
 d = 2/(22 - (1/e))
-d1 = 2/(2.6 - (1/e))
-d2 = 2/(33 - (1/e))
 
 #beta, detected symptoms by day 11
 b = 0.975
@@ -68,32 +67,74 @@ V3 <- matrix(c(
 #probability vector 
 undetProb = matrix(c(pI1, pI2, 0, 0, pU1, pU2, 0, 0, 0), ncol=1, byrow = FALSE)
 
+detectedRec = matrix(c(0,0,1,1,0,0,1,0,1), nrow = 1, byrow = TRUE)
+IRec = matrix(c(1,1,0,0,0,0,0,0,0), nrow = 1, byrow = TRUE)
+undetbyTestRec = matrix(c(0,0,0,0,1,1,0,1,0), nrow = 1, byrow = TRUE)
 
-undetRec = matrix(c(1,1,0,0,1,1,0,1,0), nrow = 1, byrow = TRUE)
-detectedRec = matrix(c(0, 0, 1, 1, 0, 0, 1, 0, 1), nrow = 1, byrow = TRUE)
 
-#
-undetRec_prob1 = function(t) {undetRec%*%expm(V1*t)%*%undetProb}
 detectedRec_prob1 = function(t) {detectedRec%*%expm(V1*t)%*%undetProb}
+IRec_prob1 = function(t) {-1*IRec %*% expm(V1*t)%*%undetProb}
+undetByTestRec_prob1 = function(t) {-1*undetbyTestRec %*% expm(V1*t) %*% undetProb}
 
-undetRec_prob2 = function(t) {undetRec%*%expm(V2*t)%*%undetProb}
-#detectedRec_prob2 = function(t) {detectedRec%*%expm(V2*t)%*%undetProb}
+detectedRec_prob2 = function(t) {detectedRec%*%expm(V2*t)%*%undetProb}
+IRec_prob2 = function(t) {-1*IRec %*% expm(V2*t)%*%undetProb}
+undetByTestRec_prob2 = function(t) {-1*undetbyTestRec %*% expm(V2*t) %*% undetProb}
 
-undetRec_prob3 = function(t) {undetRec%*%expm(V3*t)%*%undetProb}
-#detectedRec_prob3 = function(t) {detectedRec%*%expm(V3*t)%*%undetProb}
+detectedRec_prob3 = function(t) {detectedRec%*%expm(V3*t)%*%undetProb}
+IRec_prob3 = function(t) {-1*IRec %*% expm(V3*t)%*%undetProb}
+undetByTestRec_prob3 = function(t) {-1*undetbyTestRec %*% expm(V3*t) %*% undetProb}
 
 t = seq(0,30,by=.1)
 
-undetProbM1 <- as.data.frame(sapply(t, undetRec_prob1))
-undetProbM2 <- as.data.frame(sapply(t, undetRec_prob2))
-undetProbM3 <- as.data.frame(sapply(t, undetRec_prob3))
-undetProbM <- merge(t, undetProbM1)
-undetProbM <- merge(undetProbM, undetProbM2)
-undetProbM <- merge(undetProbM, undetProbM3)
+ProbM <- as.data.frame(t)
 
-qplot(t,sapply(t, undetRec_prob1) / sapply(t, detectedRec_prob1)) #plot over total sum of cases
-qplot(t, sapply(t, undetRec_prob2))
-qplot(t, sapply(t, undetRec_prob3))
+ProbM1a <-  as.data.frame(sapply(t, detectedRec_prob1))
+ProbM1b <- as.data.frame(sapply(t, IRec_prob1))
+ProbM1c <- as.data.frame(sapply(t, undetByTestRec_prob1))
+ProbM1 <- cbind(ProbM, ProbM1a, ProbM1b, ProbM1c) 
+ProbM1 <- ProbM1 %>% 
+  filter( t == 5 |  t == 10 | t == 15 ) %>% 
+  rename(detected = "sapply(t, detectedRec_prob1)", 
+         pretest = "sapply(t, IRec_prob1)", 
+         negativeTest = "sapply(t, undetByTestRec_prob1)") %>% 
+  gather(State, byDay2, -t)
 
+
+ProbM2a <- as.data.frame(sapply(t, detectedRec_prob2))
+ProbM2b <- as.data.frame(sapply(t, IRec_prob2))
+ProbM2c <- as.data.frame(sapply(t, undetByTestRec_prob2))
+ProbM2 <- cbind(ProbM, ProbM2a, ProbM2b, ProbM2c)
+ProbM2 <- ProbM2 %>% 
+  filter( t == 5 |  t == 10 | t == 15  ) %>% 
+  rename(detected = "sapply(t, detectedRec_prob2)", 
+         pretest = "sapply(t, IRec_prob2)", 
+         negativeTest = "sapply(t, undetByTestRec_prob2)") %>% 
+  gather(State, byDay5, -t)
+
+ProbM3a <- as.data.frame(sapply(t, detectedRec_prob3))
+ProbM3b <- as.data.frame(sapply(t, IRec_prob3))
+ProbM3c <- as.data.frame(sapply(t, undetByTestRec_prob3))
+ProbM3 <- cbind(ProbM, ProbM3a, ProbM3b, ProbM3c)
+ProbM3 <- ProbM3 %>% 
+  filter( t == 5 |t == 10 | t == 15 ) %>% 
+  rename(detected = "sapply(t, detectedRec_prob3)", 
+         pretest = "sapply(t, IRec_prob3)", 
+         negativeTest = "sapply(t, undetByTestRec_prob3)") %>% 
+  gather(State, afterDay5, -t)
+
+rm(ProbM1a, ProbM1b, ProbM1c, ProbM2a, ProbM2c, ProbM2b, ProbM3a, ProbM3b, ProbM3c)
+
+ProbM <- merge(ProbM1, ProbM2)
+ProbM <- merge(ProbM, ProbM3)
+ProbM <- ProbM %>% gather(TestingOption, Probability, -t, -State) %>% 
+  mutate(TestingOption = fct_relevel(TestingOption, "byDay2", "byDay5", "afterDay5")) %>% 
+  filter(State != "pretest")
+
+ggplot(ProbM, aes(x = TestingOption, y = Probability, fill = State)) + 
+  geom_bar(position = "stack", stat = "identity") + 
+  facet_wrap(~t, nrow = 5) + 
+  scale_fill_manual(values = c("olivedrab2", "slateblue4", "orange")) +
+  theme_minimal() +
+  coord_flip()
 
 
