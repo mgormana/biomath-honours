@@ -4,6 +4,7 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(forcats)
+
 asymptomatics <- function(t, x, parms = NULL) {
   with(as.list(c(x, parms)), {
     
@@ -20,7 +21,7 @@ asymptomatics <- function(t, x, parms = NULL) {
 
 #mean duration of infection
 param1a <- c(a = 0.02, b = 0.975, e = 2/5, d = 2/(21-(1/.4)), g = 0.061)
-param1b <- c(a = 0.02, b = 0.975, e = 1/5, d = 2/(2.6-(1/.4)), g = 0.061)
+param1b <- c(a = 0.02, b = 0.975, e = 2/5, d = 2/(2.6-(1/.4)), g = 0.061)
 param1c <- c(a = 0.02, b = 0.975, e = 2/5, d = 2/(33-(1/.4)), g = 0.061)
 
 param2a <- c(a = 0.5, b = 0.975, e = 2/5, d = 2/(21-(1/.4)), g = 0.061)
@@ -102,6 +103,10 @@ res_ode1.df <- merge(res_ode1.df, res_ode1c.df, by = c("time", "state"))
 res_ode1.df <- res_ode1.df %>% 
   rename(median = stateProb.x, short = stateProb.y, long = stateProb) %>% 
   gather(InfectiousPeriodLength, byDay2, -time, -state)
+rm(res_ode1a.df, res_ode1b.df, res_ode1c.df, 
+   undetected1a.df, undetected1b.df, undetected1c.df,
+   detected1a.df, detected1b.df, detected1c.df,
+   preinfectious1a.df, preinfectious1b.df, preinfectious1c.df)
 
 res_ode2a.df <- as.data.frame(ode(y = t0, times, func = asymptomatics, param2a))
 preinfectious2a.df <- res_ode2a.df %>% 
@@ -171,6 +176,10 @@ res_ode2.df <- merge(res_ode2.df, res_ode2c.df, by = c("time", "state"))
 res_ode2.df <- res_ode2.df %>% 
   rename(median = stateProb.x, short = stateProb.y, long = stateProb) %>% 
   gather(InfectiousPeriodLength, byDay5, -time, -state)
+rm(detected2a.df, detected2b.df, detected2c.df,
+   preinfectious2a.df, preinfectious2b.df, preinfectious2c.df,
+   undetected2a.df, undetected2b.df, undetected2c.df,
+   res_ode2a.df, res_ode2b.df, res_ode2c.df)
 
 res_ode3a.df <- as.data.frame(ode(y = t0, times, func = asymptomatics, param3a))
 preinfectious3a.df <- res_ode3a.df %>% 
@@ -240,6 +249,10 @@ res_ode3.df <- merge(res_ode3.df, res_ode3c.df, by = c("time", "state"))
 res_ode3.df <- res_ode3.df %>% 
   rename(median = stateProb.x, short = stateProb.y, long = stateProb) %>% 
   gather(InfectiousPeriodLength, afterDay5, -time, -state)
+rm(undetected3a.df, undetected3b.df, undetected3c.df,
+   detected3a.df, detected3b.df, detected3c.df,
+   preinfectious3a.df, preinfectious3b.df, preinfectious3c.df,
+   res_ode3a.df, res_ode3b.df, res_ode3c.df)
 
 res_ode.df <- merge(res_ode1.df, res_ode2.df)
 res_ode.df <- merge(res_ode.df, res_ode3.df)
@@ -251,11 +264,100 @@ res_ode.df <- res_ode.df %>%
 #plotting 
 ggplot(res_ode.df, aes(x = time, y = StateProbability, color = state)) + 
   geom_line() + 
-  scale_color_manual(values = c("olivedrab2", "slateblue4", "orange")) +
+  scale_color_manual(values = c("olivedrab2", "slateblue4", "orange", "magenta4")) +
   facet_wrap(~ InfectiousPeriodLength + TestingOption) + 
   theme_minimal()
 
-  
+stillUndetected1a <- as.data.frame(ode(y = t0, times, func = asymptomatics, param1a)) %>% 
+  select(time, L, I, U) %>% 
+  melt(id = "time") %>% 
+  group_by(time) %>% 
+  summarise(median = sum(value))
+stillUndetected1b <- as.data.frame(ode(y = t0, times, func = asymptomatics, param1b)) %>% 
+  select(time, L, I, U) %>% 
+  melt(id = "time") %>% 
+  group_by(time) %>% 
+  summarise(short = sum(value))
+stillUndetected1c <- as.data.frame(ode(y = t0, times, func = asymptomatics, param1a)) %>% 
+  select(time, L, I, U) %>% 
+  melt(id = "time") %>% 
+  group_by(time) %>% 
+  summarise(long = sum(value))
+byDay2 <- merge(stillUndetected1a, stillUndetected1b, by = 'time')
+byDay2 <- merge(byDay2, stillUndetected1c, by = 'time') %>% 
+  melt(id = 'time') %>% 
+  filter(time == 2) %>% 
+  select(-time) %>% 
+  rename(day2 = value)
+stillUndetected2a <- as.data.frame(ode(y = t0, times, func = asymptomatics, param2a)) %>% 
+  select(time, L, I, U) %>% 
+  melt(id = "time") %>% 
+  group_by(time) %>% 
+  summarise(median = sum(value))
+stillUndetected2b <- as.data.frame(ode(y = t0, times, func = asymptomatics, param2b)) %>% 
+  select(time, L, I, U) %>% 
+  melt(id = "time") %>% 
+  group_by(time) %>% 
+  summarise(short = sum(value))
+stillUndetected2c <- as.data.frame(ode(y = t0, times, func = asymptomatics, param2c)) %>% 
+  select(time, L, I, U) %>% 
+  melt(id = "time") %>% 
+  group_by(time) %>% 
+  summarise(long = sum(value))
+byDay5 <- merge(stillUndetected2a, stillUndetected2b, by = 'time')
+byDay5 <- merge(byDay5, stillUndetected2c, by = 'time') %>% 
+  melt(id = 'time') %>% 
+  filter(time == 5) %>% 
+  select(-time) %>% 
+  rename(day5 = value)
+stillUndetected3a <- as.data.frame(ode(y = t0, times, func = asymptomatics, param3a)) %>% 
+  select(time, L, I, U) %>% 
+  melt(id = "time") %>% 
+  group_by(time) %>% 
+  summarise(median = sum(value))
+stillUndetected3b <- as.data.frame(ode(y = t0, times, func = asymptomatics, param3b)) %>% 
+  select(time, L, I, U) %>% 
+  melt(id = "time") %>% 
+  group_by(time) %>% 
+  summarise(short = sum(value))
+stillUndetected3c <- as.data.frame(ode(y = t0, times, func = asymptomatics, param3c)) %>% 
+  select(time, L, I, U) %>% 
+  melt(id = "time") %>% 
+  group_by(time) %>% 
+  summarise(long = sum(value))
+afterDay5 <- merge(stillUndetected3a, stillUndetected3b, by = 'time')
+afterDay5 <- merge(afterDay5, stillUndetected2c, by = 'time') %>% 
+  melt(id = 'time') %>% 
+  filter(time == 7) %>% 
+  select(-time) %>% 
+  rename(day7 = value)
+afterDay5x <- merge(stillUndetected3a, stillUndetected3b, by = 'time')
+afterDay5x <- merge(afterDay5x, stillUndetected3c, by = 'time') %>% 
+  melt(id = 'time') %>% 
+  filter(time == 14) %>% 
+  select(-time) %>% 
+  rename(day14 = value)
+afterDay10 <- merge(stillUndetected3a, stillUndetected3b, by = 'time') 
+afterDay10 <- merge(afterDay10, stillUndetected3c, by = 'time') %>% 
+  melt(id = 'time') %>% 
+  filter(time == 10) %>% 
+  select(-time) %>% 
+  rename(day10 = value)
+stillUndetected <- merge(byDay2, byDay5, by = 'variable')
+stillUndetected <- merge(stillUndetected, afterDay5, by = 'variable')
+stillUndetected <- merge(stillUndetected, afterDay5x, by = 'variable') 
+stillUndetected <- merge(stillUndetected, afterDay10, by = 'variable') %>% 
+  rename(infectiousPeriod = variable) %>% 
+  melt(id = 'infectiousPeriod') %>% 
+  rename(quarantine = variable, probability = value) %>% 
+  mutate(infectiousPeriod = fct_relevel(infectiousPeriod, "short", "median", "long"))  %>% 
+  mutate(quarantine = fct_relevel(quarantine, "day2", "day5", 'day7', 'day10', 'day14'))
+
+
+ggplot(stillUndetected, aes(x = quarantine, y = probability, fill = infectiousPeriod)) + 
+  geom_bar(stat = "identity", position = 'dodge') + 
+  scale_fill_manual(values = c("olivedrab2", "slateblue4", "orange", "magenta4")) +
+  theme_minimal()
 
 #plot matrix exp
 probDetectedFn <- matrix(c(
