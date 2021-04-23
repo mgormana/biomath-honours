@@ -1,587 +1,162 @@
-library(deSolve)
-library(reshape2)
+library(expm)
 library(ggplot2)
-library(dplyr)
-library(tidyr)
-library(forcats)
+library(tidyverse)
+library(reshape2)
 
-#from end of first suscept run
-t1.X <- c(S = 0.77, L = 0.03, I = 0.02, D = 0.0, U = 0.05, Rd = 0.15, Ru = 0, F = 0.0)
-t1.Y <- c(S = 0.74, L = 0.03, I = 0.03, D = 0.0, U = 0.06, Rd = 0.15, Ru = 0, F = 0.0)
-t1.Z <- c(S = 0.71, L = 0.04, I = 0.03, D = 0.0, U = 0.08, Rd = 0.16, Ru = 0, F = 0.0)
 
-#calculating h
 a1 = 0.02
 a2 = 0.5
 a3 = 0.9
+e = 2/5
+d = 2/(22 - (1/e))
 b = 0.975
-d = 0.12
-e = 0.4
 g = 0.061
 
+#probability of being in states
+pLa = 0.043
+pIa = 0.039
+pU1a = 0.069
+pU2a = 0.01
+
+pLb = 0.044
+pIb = 0.04
+pU1b = 0.084
+pU2b = 0.011
+
+pLc = 0.046
+pIc = 0.042
+pU1c = 0.096
+pU2c = 0.012
+
+t1 = seq(0,2, by = 0.1)
+t2 = seq(0,5, by=0.1)
+t3 = seq(0,7, by = 0.1)
+
+#transition matrix
 V1 <- matrix(c(
-  -e,       0,  0,    0,
-  e,      -e,  0,    0,
-  0,     a1*e, -d,  b*d,
-  0, (1-a1)*e,  0,   -d),
-  nrow = 4, ncol = 4, byrow = TRUE)
+  -e, 0, 0, 0, 0, 0, 0, 0, 0, 
+  e, -e, 0, 0, 0, 0, 0, 0, 0, 
+  0, a1*e, -d, 0, 0, 0, 0, 0, 0, 
+  0, 0, d, -d, b*d, 0, 0, 0, 0, 
+  0, (1-a1)*e, 0, 0, -d, 0, 0, 0, 0, 
+  0, 0, 0, 0, (1-b)*d, -d, 0, 0, 0, 
+  0, 0, 0, (1-g)*d, 0, 0, 0, 0, 0, 
+  0, 0, 0, 0, 0, d, 0, 0, 0, 
+  0, 0, 0, g*d, 0, 0, 0, 0, 0), 
+  nrow = 9, ncol = 9, byrow = TRUE)
 
 V2 <- matrix(c(
-  -e,       0,  0,    0,
-  e,      -e,  0,    0,
-  0,     a2*e, -d,  b*d,
-  0, (1-a2)*e,  0,   -d),
-  nrow = 4, ncol = 4, byrow = TRUE)
+  -e, 0, 0, 0, 0, 0, 0, 0, 0, 
+  e, -e, 0, 0, 0, 0, 0, 0, 0, 
+  0, a2*e, -d, 0, 0, 0, 0, 0, 0, 
+  0, 0, d, -d, b*d, 0, 0, 0, 0, 
+  0, (1-a2)*e, 0, 0, -d, 0, 0, 0, 0, 
+  0, 0, 0, 0, (1-b)*d, -d, 0, 0, 0, 
+  0, 0, 0, (1-g)*d, 0, 0, 0, 0, 0, 
+  0, 0, 0, 0, 0, d, 0, 0, 0, 
+  0, 0, 0, g*d, 0, 0, 0, 0, 0), 
+  nrow = 9, ncol = 9, byrow = TRUE)
 
 V3 <- matrix(c(
-  -e,       0,  0,    0,
-  e,      -e,  0,    0,
-  0,     a3*e, -d,  b*d,
-  0, (1-a3)*e,  0,   -d),
-  nrow = 4, ncol = 4, byrow = TRUE)
+  -e, 0, 0, 0, 0, 0, 0, 0, 0, 
+  e, -e, 0, 0, 0, 0, 0, 0, 0, 
+  0, a3*e, -d, 0, 0, 0, 0, 0, 0, 
+  0, 0, d, -d, b*d, 0, 0, 0, 0, 
+  0, (1-a3)*e, 0, 0, -d, 0, 0, 0, 0, 
+  0, 0, 0, 0, (1-b)*d, -d, 0, 0, 0, 
+  0, 0, 0, (1-g)*d, 0, 0, 0, 0, 0, 
+  0, 0, 0, 0, 0, d, 0, 0, 0, 
+  0, 0, 0, g*d, 0, 0, 0, 0, 0), 
+  nrow = 9, ncol = 9, byrow = TRUE)
 
-inverseV1 <- solve(-V1)
-inverseV2 <- solve(-V2)
-inverseV3 <- solve(-V3)
+undetProbA = matrix(c(pLa, pIa, 0, 0, pU1a, pU2a, 0, 0, 0), ncol=1, byrow = FALSE)
+undetProbB = matrix(c(pLb, pIb, 0, 0, pU1b, pU2b, 0, 0, 0), ncol=1, byrow = FALSE)
+undetProbC = matrix(c(pLc, pIc, 0, 0, pU1c, pU2c, 0, 0, 0), ncol=1, byrow = FALSE)
 
-h1 = 0.2 #for testing within 2 days
-h2 = 0.3 #for testing within 5 days
-h3 = 0.6 #for testing after 5 days
-w = matrix(c(1, 0, 0, 0), nrow = 4, ncol = 1, byrow = FALSE)
-j1 = matrix(c(0, h1, 0, h1), nrow = 1, ncol = 4, byrow = TRUE)
-j2 = matrix(c(0, h2, 0, h2), nrow = 1, ncol = 4, byrow = TRUE)
-j3 = matrix(c(0, h3, 0, h3), nrow = 1, ncol = 4, byrow = TRUE)
-S = 1
+infectiousUndetected = matrix(c(1, 1, 0, 0, 1, 1, 0, 0, 0), nrow = 1, byrow = TRUE)
 
-Ro1 = j1 %*% inverseV1 %*% w %*% S
-Ro2 = j2 %*% inverseV2 %*% w %*% S
-Ro3 = j3 %*% inverseV3 %*% w %*% S
-rm(h1, h2, h3, w, j1, j2, j3, S, inverseV1, inverseV2, inverseV3, V1, V2, V3, a1, a2, a3, b, e, d, g, h, Ro1, Ro2, Ro3, inverseV)
+#byDay2
+IUProbFuncA = function(t) {infectiousUndetected%*%expm(V1*t)%*%undetProbA}
+IUProbFuncB = function(t) {infectiousUndetected%*%expm(V1*t)%*%undetProbB}
+IUProbFuncC = function(t) {infectiousUndetected%*%expm(V1*t)%*%undetProbC}
 
-#test within first two days of arrival
-paramsXa = c(a1 = 0.02, b = 0.975, d = 0.12, e = 0.4, g = 0.061, h = 0.2) #no iso
-paramsXb = c(a1 = 0.02, b = 0.975, d = 0.12, e = 0.4, g = 0.061, h = 0.0) #iso
+t = seq(0,30, by = 1)
+ProbA = as.data.frame(sapply(t, IUProbFuncA))
+ProbB = as.data.frame(sapply(t, IUProbFuncB))
+ProbC = as.data.frame(sapply(t, IUProbFuncC))
 
-#test within 5 days
-paramsYa = c(a1 = 0.5, b = 0.975, d = 0.12, e = 0.4, g = 0.061, h = 0.3) #no iso
-paramsYb= c(a1 = 0.5, b = 0.975, d = 0.12, e = 0.4, g = 0.061, h = 0.0)  #iso
+Prob1 = as.data.frame(t)
 
-#test within 14 days
-paramsZa = c(a1 = 0.9, b = 0.975, d = 0.12, e = 0.4, g = 0.061, h = 0.6) #no iso
-paramsZb = c(a1 = 0.9, b = 0.975, d = 0.12, e = 0.4, g = 0.061, h = 0.0) #iso
-
-
-times <- seq(0,14,by = 1)
-
-totalPop2 <- function(t, x, parms = NULL) {
-  with(as.list(c(x, parms)), {
-    dS = -h*(I+U)*S
-    dL = h*(I+U)*S - (e*L)
-    dI = -(e*I) + (e*L)
-    dD = (a1*e)*I + b*d*U - g*d*D - (1-g)*d*D
-    dU = (1-a1)*e*I - b*d*U - (1-b)*d*U
-    dRd = (1-g)*d*D 
-    dRu = (1-b)*d*U
-    dF = g*d*D
-    list(c(dS, dL, dI, dD, dU, dRd, dRu, dF))
-  })
-}
-
-#BY DAY 2
-#no isolation requirement
-susceptible2Xa <- as.data.frame(ode(y = t1.X, times, func = totalPop2, parms = paramsXa)) %>% 
-  select(time, S) %>% 
+Prob1 = cbind(Prob1, ProbA, ProbB, ProbC) %>% 
+  filter(t == 2) %>% 
+  rename(time = t,
+         weeklyTesting = "sapply(t, IUProbFuncA)", 
+         restrictedTesting = "sapply(t, IUProbFuncB)",
+         borderHealthCheck = "sapply(t, IUProbFuncC)") %>% 
   melt(id = "time") %>% 
-  filter(time == 2) %>% 
-  group_by(time) %>% 
-  summarise(susceptible = sum(value))
-detected2Xa <- as.data.frame(ode(y = t1.X, times, func = totalPop2, parms = paramsXa)) %>% 
-  select(time, D, Rd) %>% 
-  melt(id = "time") %>% 
-  filter(time == 2) %>% 
-  group_by(time) %>% 
-  summarise(detected = sum(value))
-infectious2Xa <- as.data.frame(ode(y = t1.X, times, func = totalPop2, parms = paramsXa)) %>% 
-  select(time, L, I, U) %>% 
-  melt(id = "time") %>% 
-  filter(time == 2) %>% 
-  group_by(time) %>% 
-  summarise(infectious = sum(value))
-ode2Xa <- merge(susceptible2Xa, detected2Xa, by = c("time"))
-ode2Xa <- merge(ode2Xa, infectious2Xa, by = "time") %>% 
-  melt(id = "time") %>% 
-  rename(state = variable, noIso = value)
-
-#medium restriction origin
-#isolation requirement 
-susceptible2Xb <- as.data.frame(ode(y = t1.X, times, func = totalPop2, parms = paramsXb)) %>% 
-  select(time, S) %>% 
-  melt(id = "time") %>% 
-  filter(time == 2) %>% 
-  group_by(time) %>% 
-  summarise(susceptible = sum(value))
-detected2Xb <- as.data.frame(ode(y = t1.X, times, func = totalPop2, parms = paramsXb)) %>% 
-  select(time, D, Rd) %>% 
-  melt(id = "time") %>%
-  filter(time == 2) %>% 
-  group_by(time) %>% 
-  summarise(detected = sum(value))
-infectious2Xb <- as.data.frame(ode(y = t1.X, times, func = totalPop2, parms = paramsXb)) %>% 
-  select(time, L, I, U) %>% 
-  melt(id = "time") %>% 
-  filter(time == 2) %>% 
-  group_by(time) %>% 
-  summarise(infectious = sum(value))
-ode2Xb <- merge(susceptible2Xb, detected2Xb, by = c("time"))
-ode2Xb <- merge(ode2Xb, infectious2Xb, by = "time") %>% 
-  melt(id = "time") %>% 
-  rename(state = variable, Iso = value)
-high.df <- merge(ode2Xa, ode2Xb, by = c("time", "state")) %>% 
-  melt(id = c("time", "state")) %>% 
-  rename(quarantineMeasure = variable, high = value)
-
-#no isolation requirement
-susceptible2Ya <- as.data.frame(ode(y = t1.Y, times, func = totalPop2, parms = paramsXa)) %>% 
-  select(time, S) %>% 
-  melt(id = "time") %>% 
-  filter(time == 2) %>% 
-  group_by(time) %>% 
-  summarise(susceptible = sum(value))
-detected2Ya <- as.data.frame(ode(y = t1.Y, times, func = totalPop2, parms = paramsXa)) %>% 
-  select(time, D, Rd) %>% 
-  melt(id = "time") %>% 
-  filter(time == 2) %>% 
-  group_by(time) %>% 
-  summarise(detected = sum(value))
-infectious2Ya <- as.data.frame(ode(y = t1.Y, times, func = totalPop2, parms = paramsXa)) %>% 
-  select(time, L, I, U) %>% 
-  melt(id = "time") %>% 
-  filter(time == 2) %>% 
-  group_by(time) %>% 
-  summarise(infectious = sum(value))
-ode2Ya <- merge(susceptible2Ya, detected2Ya, by = c("time"))
-ode2Ya <- merge(ode2Ya, infectious2Ya, by = "time") %>% 
-  melt(id = "time") %>% 
-  rename(state = variable, noIso = value)
-
-#isolation requirement 
-susceptible2Yb <- as.data.frame(ode(y = t1.Y, times, func = totalPop2, parms = paramsXb)) %>% 
-  select(time, S) %>% 
-  melt(id = "time") %>% 
-  filter(time == 2) %>% 
-  group_by(time) %>% 
-  summarise(susceptible = sum(value))
-detected2Yb <- as.data.frame(ode(y = t1.Y, times, func = totalPop2, parms = paramsXb)) %>% 
-  select(time, D, Rd) %>% 
-  melt(id = "time") %>% 
-  filter(time == 2) %>% 
-  group_by(time) %>% 
-  summarise(detected = sum(value))
-infectious2Yb <- as.data.frame(ode(y = t1.Y, times, func = totalPop2, parms = paramsXb)) %>% 
-  select(time, L, I, U) %>% 
-  melt(id = "time") %>% 
-  filter(time == 2) %>% 
-  group_by(time) %>% 
-  summarise(infectious = sum(value))
-ode2Yb <- merge(susceptible2Yb, detected2Yb, by = c("time"))
-ode2Yb <- merge(ode2Yb, infectious2Yb, by = "time") %>% 
-  melt(id = "time") %>% 
-  rename(state = variable, Iso = value)
-medium.df <- merge(ode2Ya, ode2Yb, by = c("time", "state")) %>% 
-  melt(id = c("time", "state")) %>% 
-  rename(quarantineMeasure = variable, medium = value)
-
-susceptible2Za <- as.data.frame(ode(y = t1.Z, times, func = totalPop2, parms = paramsXa)) %>% 
-  select(time, S) %>% 
-  melt(id = "time") %>% 
-  filter(time == 2) %>% 
-  group_by(time) %>% 
-  summarise(susceptible = sum(value))
-detected2Za <- as.data.frame(ode(y = t1.Z, times, func = totalPop2, parms = paramsXa)) %>% 
-  select(time, D, Rd) %>% 
-  melt(id = "time") %>% 
-  filter(time == 2) %>% 
-  group_by(time) %>% 
-  summarise(detected = sum(value))
-infectious2Za <- as.data.frame(ode(y = t1.Z, times, func = totalPop2, parms = paramsXa)) %>% 
-  select(time, L, I, U) %>% 
-  melt(id = "time") %>%
-  filter(time == 2) %>% 
-  group_by(time) %>% 
-  summarise(infectious = sum(value))
-ode2Za <- merge(susceptible2Za, detected2Za, by = c("time"))
-ode2Za <- merge(ode2Za, infectious2Za, by = "time") %>% 
-  melt(id = "time") %>% 
-  rename(state = variable, noIso = value)
-
-#isolation requirement 
-susceptible2Zb <- as.data.frame(ode(y = t1.Z, times, func = totalPop2, parms = paramsXb)) %>% 
-  select(time, S) %>% 
-  melt(id = "time") %>% 
-  filter(time == 2) %>% 
-  group_by(time) %>% 
-  summarise(susceptible = sum(value))
-detected2Zb <- as.data.frame(ode(y = t1.Z, times, func = totalPop2, parms = paramsXb)) %>% 
-  select(time, D, Rd) %>% 
-  melt(id = "time") %>% 
-  filter(time == 2) %>% 
-  group_by(time) %>% 
-  summarise(detected = sum(value))
-infectious2Zb <- as.data.frame(ode(y = t1.Z, times, func = totalPop2, parms = paramsXb)) %>% 
-  select(time, L, I, U) %>% 
-  melt(id = "time") %>% 
-  filter(time == 2) %>% 
-  group_by(time) %>% 
-  summarise(infectious = sum(value))
-ode2Zb <- merge(susceptible2Zb, detected2Zb, by = c("time"))
-ode2Zb <- merge(ode2Zb, infectious2Zb, by = "time") %>% 
-  melt(id = "time") %>% 
-  rename(state = variable, Iso = value)
-low.df <- merge(ode2Za, ode2Zb, by = c("time", "state")) %>% 
-  melt(id = c("time", "state")) %>% 
-  rename(quarantineMeasure = variable, low = value)
-
-byDay2.df <- merge(high.df, medium.df, by = c('time', 'state', 'quarantineMeasure'))
-byDay2.df <- merge(byDay2.df, low.df, by = c('time', 'state', 'quarantineMeasure')) %>% 
-  melt(id = c('time', "state", 'quarantineMeasure')) %>% 
   select(-time) %>% 
-  rename(originRestriction = variable, byDay2 = value)
+  rename(NPI = variable, byDay2 = value)
 
-#BY DAY 5
-susceptible2Xa <- as.data.frame(ode(y = t1.X, times, func = totalPop2, parms = paramsYa)) %>% 
-  select(time, S) %>% 
-  melt(id = "time") %>% 
-  filter(time == 5) %>% 
-  group_by(time) %>% 
-  summarise(susceptible = sum(value))
-detected2Xa <- as.data.frame(ode(y = t1.X, times, func = totalPop2, parms = paramsYa)) %>% 
-  select(time, D, Rd) %>% 
-  melt(id = "time") %>% 
-  filter(time == 5) %>% 
-  group_by(time) %>% 
-  summarise(detected = sum(value))
-infectious2Xa <- as.data.frame(ode(y = t1.X, times, func = totalPop2, parms = paramsYa)) %>% 
-  select(time, L, I, U) %>% 
-  melt(id = "time") %>% 
-  filter(time == 5) %>% 
-  group_by(time) %>% 
-  summarise(infectious = sum(value))
-ode2Xa <- merge(susceptible2Xa, detected2Xa, by = c("time"))
-ode2Xa <- merge(ode2Xa, infectious2Xa, by = "time") %>% 
-  melt(id = "time") %>% 
-  rename(state = variable, noIso = value)
+#byDay5
+IUProbFuncA = function(t) {infectiousUndetected%*%expm(V2*t2)%*%undetProbA}
+IUProbFuncB = function(t) {infectiousUndetected%*%expm(V2*t2)%*%undetProbB}
+IUProbFuncC = function(t) {infectiousUndetected%*%expm(V2*t2)%*%undetProbC}
 
-#isolation requirement 
-susceptible2Xb <- as.data.frame(ode(y = t1.X, times, func = totalPop2, parms = paramsYb)) %>% 
-  select(time, S) %>% 
-  melt(id = "time") %>% 
-  filter(time == 5) %>% 
-  group_by(time) %>% 
-  summarise(susceptible = sum(value))
-detected2Xb <- as.data.frame(ode(y = t1.X, times, func = totalPop2, parms = paramsYb)) %>% 
-  select(time, D, Rd) %>% 
-  melt(id = "time") %>% 
-  filter(time == 5) %>% 
-  group_by(time) %>% 
-  summarise(detected = sum(value))
-infectious2Xb <- as.data.frame(ode(y = t1.X, times, func = totalPop2, parms = paramsYb)) %>% 
-  select(time, L, I, U) %>% 
-  melt(id = "time") %>% 
-  filter(time == 5) %>% 
-  group_by(time) %>% 
-  summarise(infectious = sum(value))
-ode2Xb <- merge(susceptible2Xb, detected2Xb, by = c("time"))
-ode2Xb <- merge(ode2Xb, infectious2Xb, by = "time") %>% 
-  melt(id = "time") %>% 
-  rename(state = variable, Iso = value)
-high.df <- merge(ode2Xa, ode2Xb, by = c("time", "state")) %>% 
-  melt(id = c("time", "state")) %>% 
-  rename(quarantineMeasure = variable, high = value)
+ProbA = as.data.frame(sapply(t, IUProbFuncA))
+ProbB = as.data.frame(sapply(t, IUProbFuncB))
+ProbC = as.data.frame(sapply(t, IUProbFuncC))
 
-#no isolation requirement
-susceptible2Ya <- as.data.frame(ode(y = t1.Y, times, func = totalPop2, parms = paramsYa)) %>% 
-  select(time, S) %>% 
-  melt(id = "time") %>% 
-  filter(time == 5) %>% 
-  group_by(time) %>% 
-  summarise(susceptible = sum(value))
-detected2Ya <- as.data.frame(ode(y = t1.Y, times, func = totalPop2, parms = paramsYa)) %>% 
-  select(time, D, Rd) %>% 
-  melt(id = "time") %>% 
-  filter(time == 5) %>% 
-  group_by(time) %>% 
-  summarise(detected = sum(value))
-infectious2Ya <- as.data.frame(ode(y = t1.Y, times, func = totalPop2, parms = paramsYa)) %>% 
-  select(time, L, I, U) %>% 
-  melt(id = "time") %>%
-  filter(time == 5) %>% 
-  group_by(time) %>% 
-  summarise(infectious = sum(value))
-ode2Ya <- merge(susceptible2Ya, detected2Ya, by = c("time"))
-ode2Ya <- merge(ode2Ya, infectious2Ya, by = "time") %>% 
-  melt(id = "time") %>% 
-  rename(state = variable, noIso = value)
+Prob2 = as.data.frame(t)
 
-#isolation requirement 
-susceptible2Yb <- as.data.frame(ode(y = t1.Y, times, func = totalPop2, parms = paramsYb)) %>% 
-  select(time, S) %>% 
+Prob2 = cbind(Prob2, ProbA, ProbB, ProbC) %>% 
+  filter(t == 5) %>% 
+  rename(time = t,
+         weeklyTesting = "sapply(t, IUProbFuncA)", 
+         restrictedTesting = "sapply(t, IUProbFuncB)",
+         borderHealthCheck = "sapply(t, IUProbFuncC)") %>% 
   melt(id = "time") %>% 
-  filter(time == 5) %>% 
-  group_by(time) %>% 
-  summarise(susceptible = sum(value))
-detected2Yb <- as.data.frame(ode(y = t1.Y, times, func = totalPop2, parms = paramsYb)) %>% 
-  select(time, D, Rd) %>% 
-  melt(id = "time") %>% 
-  filter(time == 5) %>% 
-  group_by(time) %>% 
-  summarise(detected = sum(value))
-infectious2Yb <- as.data.frame(ode(y = t1.Y, times, func = totalPop2, parms = paramsYb)) %>% 
-  select(time, L, I, U) %>% 
-  melt(id = "time") %>% 
-  filter(time == 5) %>% 
-  group_by(time) %>% 
-  summarise(infectious = sum(value))
-ode2Yb <- merge(susceptible2Yb, detected2Yb, by = c("time"))
-ode2Yb <- merge(ode2Yb, infectious2Yb, by = "time") %>% 
-  melt(id = "time") %>% 
-  rename(state = variable, Iso = value)
-medium.df <- merge(ode2Ya, ode2Yb, by = c("time", "state")) %>% 
-  melt(id = c("time", "state")) %>% 
-  rename(quarantineMeasure = variable, medium = value)
-
-susceptible2Za <- as.data.frame(ode(y = t1.Z, times, func = totalPop2, parms = paramsYa)) %>% 
-  select(time, S) %>% 
-  melt(id = "time") %>% 
-  filter(time == 5) %>% 
-  group_by(time) %>% 
-  summarise(susceptible = sum(value))
-detected2Za <- as.data.frame(ode(y = t1.Z, times, func = totalPop2, parms = paramsYa)) %>% 
-  select(time, D, Rd) %>% 
-  melt(id = "time") %>% 
-  filter(time == 5) %>% 
-  group_by(time) %>% 
-  summarise(detected = sum(value))
-infectious2Za <- as.data.frame(ode(y = t1.Z, times, func = totalPop2, parms = paramsYa)) %>% 
-  select(time, L, I, U) %>% 
-  melt(id = "time") %>% 
-  filter(time == 5) %>% 
-  group_by(time) %>% 
-  summarise(infectious = sum(value))
-ode2Za <- merge(susceptible2Za, detected2Za, by = c("time"))
-ode2Za <- merge(ode2Za, infectious2Za, by = "time") %>% 
-  melt(id = "time") %>% 
-  rename(state = variable, noIso = value)
-
-#isolation requirement 
-susceptible2Zb <- as.data.frame(ode(y = t1.Z, times, func = totalPop2, parms = paramsYb)) %>% 
-  select(time, S) %>% 
-  melt(id = "time") %>% 
-  filter(time == 5) %>% 
-  group_by(time) %>% 
-  summarise(susceptible = sum(value))
-detected2Zb <- as.data.frame(ode(y = t1.Z, times, func = totalPop2, parms = paramsYb)) %>% 
-  select(time, D, Rd) %>% 
-  melt(id = "time") %>% 
-  filter(time == 5) %>% 
-  group_by(time) %>% 
-  summarise(detected = sum(value))
-infectious2Zb <- as.data.frame(ode(y = t1.Z, times, func = totalPop2, parms = paramsYb)) %>% 
-  select(time, L, I, U) %>% 
-  melt(id = "time") %>% 
-  filter(time == 5) %>% 
-  group_by(time) %>% 
-  summarise(infectious = sum(value))
-ode2Zb <- merge(susceptible2Zb, detected2Zb, by = c("time"))
-ode2Zb <- merge(ode2Zb, infectious2Zb, by = "time") %>% 
-  melt(id = "time") %>% 
-  rename(state = variable, Iso = value)
-low.df <- merge(ode2Za, ode2Zb, by = c("time", "state")) %>% 
-  melt(id = c("time", "state")) %>% 
-  rename(quarantineMeasure = variable, low = value)
-
-byDay5.df <- merge(high.df, medium.df, by = c('time', 'state', 'quarantineMeasure'))
-byDay5.df <- merge(byDay5.df, low.df, by = c('time', 'state', 'quarantineMeasure')) %>% 
-  melt(id = c('time', "state", 'quarantineMeasure')) %>% 
   select(-time) %>% 
-  rename(originRestriction = variable, byDay5 = value)
+  rename(NPI = variable, byDay5 = value)
 
-#AFTER DAY 5
-susceptible2Xa <- as.data.frame(ode(y = t1.X, times, func = totalPop2, parms = paramsZa)) %>% 
-  select(time, S) %>% 
-  melt(id = "time") %>% 
-  filter(time == 14) %>% 
-  group_by(time) %>% 
-  summarise(susceptible = sum(value))
-detected2Xa <- as.data.frame(ode(y = t1.X, times, func = totalPop2, parms = paramsZa)) %>% 
-  select(time, D, Rd) %>% 
-  melt(id = "time") %>% 
-  filter(time == 14) %>%
-  group_by(time) %>% 
-  summarise(detected = sum(value))
-infectious2Xa <- as.data.frame(ode(y = t1.X, times, func = totalPop2, parms = paramsZa)) %>% 
-  select(time, L, I, U) %>% 
-  melt(id = "time") %>% 
-  filter(time == 14) %>%
-  group_by(time) %>% 
-  summarise(infectious = sum(value))
-ode2Xa <- merge(susceptible2Xa, detected2Xa, by = c("time"))
-ode2Xa <- merge(ode2Xa, infectious2Xa, by = "time") %>% 
-  melt(id = "time") %>% 
-  rename(state = variable, noIso = value)
+#afterDay5
+IUProbFuncA = function(t) {infectiousUndetected%*%expm(V3*t3)%*%undetProbA}
+IUProbFuncB = function(t) {infectiousUndetected%*%expm(V3*t3)%*%undetProbB}
+IUProbFuncC = function(t) {infectiousUndetected%*%expm(V3*t3)%*%undetProbC}
 
-#isolation requirement 
-susceptible2Xb <- as.data.frame(ode(y = t1.X, times, func = totalPop2, parms = paramsZb)) %>% 
-  select(time, S) %>% 
-  melt(id = "time") %>% 
-  filter(time == 14) %>%
-  group_by(time) %>% 
-  summarise(susceptible = sum(value))
-detected2Xb <- as.data.frame(ode(y = t1.X, times, func = totalPop2, parms = paramsZb)) %>% 
-  select(time, D, Rd) %>% 
-  melt(id = "time") %>% 
-  filter(time == 14) %>%
-  group_by(time) %>% 
-  summarise(detected = sum(value))
-infectious2Xb <- as.data.frame(ode(y = t1.X, times, func = totalPop2, parms = paramsZb)) %>% 
-  select(time, L, I, U) %>% 
-  melt(id = "time") %>% 
-  filter(time == 14) %>%
-  group_by(time) %>% 
-  summarise(infectious = sum(value))
-ode2Xb <- merge(susceptible2Xb, detected2Xb, by = c("time"))
-ode2Xb <- merge(ode2Xb, infectious2Xb, by = "time") %>% 
-  melt(id = "time") %>% 
-  rename(state = variable, Iso = value)
-high.df <- merge(ode2Xa, ode2Xb, by = c("time", "state")) %>% 
-  melt(id = c("time", "state")) %>% 
-  rename(quarantineMeasure = variable, high = value)
+ProbA = as.data.frame(sapply(t, IUProbFuncA))
+ProbB = as.data.frame(sapply(t, IUProbFuncB))
+ProbC = as.data.frame(sapply(t, IUProbFuncC))
 
-#no isolation requirement
-susceptible2Ya <- as.data.frame(ode(y = t1.Y, times, func = totalPop2, parms = paramsZa)) %>% 
-  select(time, S) %>% 
-  melt(id = "time") %>% 
-  filter(time == 14) %>%
-  group_by(time) %>% 
-  summarise(susceptible = sum(value))
-detected2Ya <- as.data.frame(ode(y = t1.Y, times, func = totalPop2, parms = paramsZa)) %>% 
-  select(time, D, Rd) %>% 
-  melt(id = "time") %>%
-  filter(time == 14) %>%
-  group_by(time) %>% 
-  summarise(detected = sum(value))
-infectious2Ya <- as.data.frame(ode(y = t1.Y, times, func = totalPop2, parms = paramsZa)) %>% 
-  select(time, L, I, U) %>% 
-  melt(id = "time") %>% 
-  filter(time == 14) %>%
-  group_by(time) %>% 
-  summarise(infectious = sum(value))
-ode2Ya <- merge(susceptible2Ya, detected2Ya, by = c("time"))
-ode2Ya <- merge(ode2Ya, infectious2Ya, by = "time") %>% 
-  melt(id = "time") %>% 
-  rename(state = variable, noIso = value)
+Prob3 = as.data.frame(t)
 
-#isolation requirement 
-susceptible2Yb <- as.data.frame(ode(y = t1.Y, times, func = totalPop2, parms = paramsZb)) %>% 
-  select(time, S) %>% 
+Prob3 = cbind(Prob3, ProbA, ProbB, ProbC) %>% 
+  filter(t == 5) %>% 
+  rename(time = t,
+         weeklyTesting = "sapply(t, IUProbFuncA)", 
+         restrictedTesting = "sapply(t, IUProbFuncB)",
+         borderHealthCheck = "sapply(t, IUProbFuncC)") %>% 
   melt(id = "time") %>% 
-  filter(time == 14) %>%
-  group_by(time) %>% 
-  summarise(susceptible = sum(value))
-detected2Yb <- as.data.frame(ode(y = t1.Y, times, func = totalPop2, parms = paramsZb)) %>% 
-  select(time, D, Rd) %>% 
-  melt(id = "time") %>% 
-  filter(time == 14) %>%
-  group_by(time) %>% 
-  summarise(detected = sum(value))
-infectious2Yb <- as.data.frame(ode(y = t1.Y, times, func = totalPop2, parms = paramsZb)) %>% 
-  select(time, L, I, U) %>% 
-  melt(id = "time") %>% 
-  filter(time == 14) %>%
-  group_by(time) %>% 
-  summarise(infectious = sum(value))
-ode2Yb <- merge(susceptible2Yb, detected2Yb, by = c("time"))
-ode2Yb <- merge(ode2Yb, infectious2Yb, by = "time") %>% 
-  melt(id = "time") %>% 
-  rename(state = variable, Iso = value)
-medium.df <- merge(ode2Ya, ode2Yb, by = c("time", "state")) %>% 
-  melt(id = c("time", "state")) %>% 
-  rename(quarantineMeasure = variable, medium = value)
-
-susceptible2Za <- as.data.frame(ode(y = t1.Z, times, func = totalPop2, parms = paramsZa)) %>% 
-  select(time, S) %>% 
-  melt(id = "time") %>% 
-  filter(time == 14) %>%
-  group_by(time) %>% 
-  summarise(susceptible = sum(value))
-detected2Za <- as.data.frame(ode(y = t1.Z, times, func = totalPop2, parms = paramsZa)) %>% 
-  select(time, D, Rd) %>% 
-  melt(id = "time") %>% 
-  filter(time == 14) %>%
-  group_by(time) %>% 
-  summarise(detected = sum(value))
-infectious2Za <- as.data.frame(ode(y = t1.Z, times, func = totalPop2, parms = paramsZa)) %>% 
-  select(time, L, I, U) %>% 
-  melt(id = "time") %>% 
-  filter(time == 14) %>%
-  group_by(time) %>% 
-  summarise(infectious = sum(value))
-ode2Za <- merge(susceptible2Za, detected2Za, by = c("time"))
-ode2Za <- merge(ode2Za, infectious2Za, by = "time") %>% 
-  melt(id = "time") %>% 
-  rename(state = variable, noIso = value)
-
-#isolation requirement 
-susceptible2Zb <- as.data.frame(ode(y = t1.Z, times, func = totalPop2, parms = paramsZb)) %>% 
-  select(time, S) %>% 
-  melt(id = "time") %>% 
-  filter(time == 14) %>%
-  group_by(time) %>% 
-  summarise(susceptible = sum(value))
-detected2Zb <- as.data.frame(ode(y = t1.Z, times, func = totalPop2, parms = paramsZb)) %>% 
-  select(time, D, Rd) %>% 
-  melt(id = "time") %>% 
-  filter(time == 14) %>%
-  group_by(time) %>% 
-  summarise(detected = sum(value))
-infectious2Zb <- as.data.frame(ode(y = t1.Z, times, func = totalPop2, parms = paramsZb)) %>% 
-  select(time, L, I, U) %>% 
-  melt(id = "time") %>% 
-  filter(time == 14) %>%
-  group_by(time) %>% 
-  summarise(infectious = sum(value))
-ode2Zb <- merge(susceptible2Zb, detected2Zb, by = c("time"))
-ode2Zb <- merge(ode2Zb, infectious2Zb, by = "time") %>% 
-  melt(id = "time") %>% 
-  rename(state = variable, Iso = value)
-low.df <- merge(ode2Za, ode2Zb, by = c("time", "state")) %>% 
-  melt(id = c("time", "state")) %>% 
-  rename(quarantineMeasure = variable, low = value)
-
-afterDay5.df <- merge(high.df, medium.df, by = c('time', 'state', 'quarantineMeasure'))
-afterDay5.df <- merge(afterDay5.df, low.df, by = c('time', 'state', 'quarantineMeasure')) %>% 
-  melt(id = c('time', "state", 'quarantineMeasure')) %>% 
   select(-time) %>% 
-  rename(originRestriction = variable, afterDay5 = value)
+  rename(NPI = variable, afterDay5 = value)
 
-#MERGING ALL TOGETHER
-data <- merge(byDay2.df, byDay5.df, by = c("state", 'quarantineMeasure', 'originRestriction'))
-data <- merge(data, afterDay5.df, id = c("state", "quarantineMeasure", "originRestriction")) %>% 
-  melt(id = c('state', 'quarantineMeasure', 'originRestriction')) %>% 
-  rename(testingOption = variable, probability = value)
-stillInfectious <- filter(data, state == "infectious")
+#merging testing options
+ProbM = merge(Prob1, Prob2, by = "NPI")
+ProbM = merge(ProbM, Prob3, by = "NPI") %>% 
+  melt(id = "NPI") %>% 
+  rename(testingStrategy = variable, ProbInfectiousUndetected = value)
 
-ggplot(stillInfectious, aes(x = originRestriction, y = probability)) + 
-  geom_point(aes(color = quarantineMeasure, shape = testingOption), size = 3) + 
+ggplot(ProbM, aes(x=testingStrategy, y = ProbInfectiousUndetected, color = NPI, group = NPI)) + 
+  geom_point(size =4) +
+  geom_line() + 
   theme_minimal() + 
-  scale_colour_manual(values = c("olivedrab2", 'slateblue4', 'orange'))
+  scale_color_manual(values = c("#f00000","#ffc709", "slateblue4"),
+                     name = "Case Detection Efforts Prior to Arrival",
+                     labels = c("Weekly Asymptomatic Testing", "Border Health Check", "None")) +
+  scale_x_discrete(name = "Day of Test", labels = c("Day 2", "Day 5", "Day 7")) + 
+  scale_y_continuous(name = "P(Infectious and Undetected)", labels = label_percent(accuracy = 1)) + 
+  theme(axis.text = element_text(size = 14), 
+        axis.title =element_text(size = 18), 
+        legend.title = element_text(size = 18),
+        legend.text = element_text(size = 14),
+        strip.text = element_text(size = 18))
 
-ggplot(stillInfectious, aes(x = quarantineMeasure, y = probability)) + 
-  geom_point(aes(color = originRestriction, shape = testingOption), size = 3) + 
-  theme_minimal() + 
-  scale_colour_manual(values = c("olivedrab2", 'slateblue4', 'orange'))
-
-
-isolated = subset(data, quarantineMeasure == "Iso") %>% select(-quarantineMeasure)
-ggplot(isolated, aes(x = originRestriction, y = probability, fill = state)) + 
-  geom_bar(position = "stack", stat = 'identity') + 
-  facet_wrap(~testingOption)
